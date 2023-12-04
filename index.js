@@ -33,6 +33,7 @@ async function run() {
     const adoptionReqCollection = client.db("adoptionRequestDB").collection("allAdoptionRequest");
     const donationcollection = client.db("donationDB").collection("allDonation");
     const donarsCollection = client.db("donarsDB").collection("allDonars");
+    const usersCollection = client.db("usersDB").collection("allUsers");
     // Connect the client to the server	(optional starting in v4.7)
     // await client.connect();
     // Send a ping to confirm a successful connection
@@ -62,19 +63,90 @@ async function run() {
     }
     // console.log(process.env.ACCESS_TOKEN);
 
+    const verifyAdmin = async (req, res, next) => {
+      const email = req.decoded.email;
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      const isAdmin = user?.role === 'admin';
+      if (!isAdmin) {
+        return res.status(403).send({ message: 'forbidden access' })
+      }
+      next();
+    }
 
-    // app pets api
+
+   
+    // user related api
+
+    app.post('/users', async (req, res) => {
+      const user = req.body;
+      const query = { email: user.email }
+      const existingUser = await usersCollection.findOne(query);
+      if (existingUser) {
+        return res.send({ message: 'user already exists' })
+      }
+      else {
+        const result = await usersCollection.insertOne(user);
+        res.send(result);
+      }
+    });
+
+    app.get('/users', verifyToken, async (req, res) => {
+      // console.log('ami', req.headers);
+      const result = await usersCollection.find().toArray();
+      res.send(result)
+    })
+
+
+    app.get('/users/admin/:email', verifyToken, async (req, res) => {
+      const email = req.params.email;
+      if (email !== req.decoded.email) {
+        return res.status(403).send({ message: 'unauthorized access' })
+      }
+      const query = { email: email };
+      const user = await usersCollection.findOne(query);
+      let admin = false;
+      if (user) {
+        admin = user?.role === 'admin';
+      }
+      res.send({ admin })
+    })
+    app.patch('/users/admin/:id', async (req, res) => {
+      const id = req.params.id;
+      const filter = { _id: new ObjectId(id) };
+      const updateDoc = {
+        $set: {
+          role: 'admin'
+        }
+      }
+      const result = await usersCollection.updateOne(filter, updateDoc);
+      res.send(result);
+    })
+
+     // app pets api
 
     app.get("/allPets", async (req, res) => {
+      const email = req.query.email;
+      if (email) {
+        const query = { email: email }
+        const result = await petCollection.find(query).sort({ date: -1 }).toArray();
+        return res.send(result)
+      }
       const result = await petCollection.find().sort({ date: -1 }).toArray();
       res.send(result)
       // console.log(req.headers);
     });
+
+
+
     app.post("/allPets", async (req, res) => {
       const petInfo = req.body;
       const result = await petCollection.insertOne(petInfo);
       res.send(result);
     });
+
+
+
     app.get("/allPets/:id", async (req, res) => {
       const id = req.params.id;
       const query = {
@@ -83,6 +155,40 @@ async function run() {
       const result = await petCollection.findOne(query);
       res.send(result);
     })
+
+    app.delete('/allPets/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await petCollection.deleteOne(query);
+      res.send(result);
+    });
+
+
+    app.put("/allPets/:id", verifyToken,  async (req, res) => {
+      const id = req.params.id;
+      const data = req.body;
+
+
+      const filter = {
+          _id: new ObjectId(id)
+      };
+      const options = { upsert: true };
+      const updatedData = {
+          $set: {
+              image: data.image,
+              name: data.name,
+              category: data.category,
+              location: data.location,
+              shortDescription: data.shortDescription,
+              longDescription: data.longDescription,
+              age: data.age
+          }
+      };
+      const result = await petCollection.updateOne(filter, updatedData, options);
+      res.send(result);
+  })
+
+
 
 
     app.post('/adoptionRequest', async (req, res) => {
@@ -118,7 +224,7 @@ async function run() {
 
 
     // donars api
-    app.post("/allDonars", async(req, res) => {
+    app.post("/allDonars", async (req, res) => {
       const donarsInfo = req.body;
       const result = await donarsCollection.insertOne(donarsInfo);
       res.send(result);
@@ -126,7 +232,7 @@ async function run() {
 
 
     app.post('/create-payment-intent', async (req, res) => {
-      const {donationAmount} = req.body;
+      const { donationAmount } = req.body;
       const amount = parseInt(donationAmount * 100);
       console.log(amount);
 
@@ -144,8 +250,8 @@ async function run() {
 
 
 
-    await client.db("admin").command({ ping: 1 });
-    console.log("Pinged your deployment. You successfully connected to MongoDB!");
+    // await client.db("admin").command({ ping: 1 });
+    // console.log("Pinged your deployment. You successfully connected to MongoDB!");
   } finally {
     // Ensures that the client will close when you finish/error
     // await client.close();
