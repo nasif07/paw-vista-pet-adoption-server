@@ -75,7 +75,7 @@ async function run() {
     }
 
 
-   
+
     // user related api
 
     app.post('/users', async (req, res) => {
@@ -123,7 +123,7 @@ async function run() {
       res.send(result);
     })
 
-     // app pets api
+    // app pets api
 
     app.get("/allPets", async (req, res) => {
       const email = req.query.email;
@@ -164,29 +164,29 @@ async function run() {
     });
 
 
-    app.put("/allPets/:id", verifyToken,  async (req, res) => {
+    app.put("/allPets/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
       const data = req.body;
 
 
       const filter = {
-          _id: new ObjectId(id)
+        _id: new ObjectId(id)
       };
       const options = { upsert: true };
       const updatedData = {
-          $set: {
-              image: data.image,
-              name: data.name,
-              category: data.category,
-              location: data.location,
-              shortDescription: data.shortDescription,
-              longDescription: data.longDescription,
-              age: data.age
-          }
+        $set: {
+          image: data.image,
+          name: data.name,
+          category: data.category,
+          location: data.location,
+          shortDescription: data.shortDescription,
+          longDescription: data.longDescription,
+          age: data.age
+        }
       };
       const result = await petCollection.updateOne(filter, updatedData, options);
       res.send(result);
-  })
+    })
 
 
 
@@ -207,6 +207,27 @@ async function run() {
       res.send(result)
       // console.log(req.headers);
     });
+    app.post("/allDonation", async (req, res) => {
+      const data = req.body;
+      const result = await donationcollection.insertOne(data);
+      res.send(result);
+    });
+
+    app.get("/userDonation", async (req, res) => {
+      const email = req.query.email;
+      const query = { email: email }
+      const result = await donarsCollection.find(query).sort({ date: -1 }).toArray();
+      return res.send(result)
+    })
+
+    app.delete('/userDonation/:id', async (req, res) => {
+      const id = req.params.id;
+      const query = { _id: new ObjectId(id) };
+      const result = await donarsCollection.deleteOne(query);
+      res.send(result);
+    });
+
+
     app.get("/allDonation/:id", verifyToken, async (req, res) => {
       const id = req.params.id;
       const query = {
@@ -261,7 +282,7 @@ run().catch(console.dir);
 
 
 app.get('/', (req, res) => {
-  res.send('bestro boss server is running!')
+  res.send('Paw Vista server is running!')
 })
 
 app.listen(port, () => {
